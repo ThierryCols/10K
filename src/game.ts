@@ -29,7 +29,7 @@ export function createScoreboard() {
     players: [] as Player[],
     newPlayerName: '',
     currentPlayerIndex: 0,
-    turnScore: '' as string,
+    turnScore: 0,
     lastMessage: '',
 
     init() {
@@ -151,9 +151,13 @@ export function createScoreboard() {
       return messages
     },
 
+    addToTurn(amount: number) {
+      this.turnScore += amount
+    },
+
     recordTurn() {
-      const score = parseInt(this.turnScore, 10)
-      if (isNaN(score) || score < 0 || !this.currentPlayer || this.winner) return
+      const score = this.turnScore
+      if (score < 0 || !this.currentPlayer || this.winner) return
 
       const player = this.currentPlayer
       this.lastMessage = ''
@@ -183,7 +187,7 @@ export function createScoreboard() {
       }
 
       this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length
-      this.turnScore = ''
+      this.turnScore = 0
       this.saveState()
     },
 

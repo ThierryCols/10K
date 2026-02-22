@@ -72,18 +72,23 @@
 
         <!-- Turn input -->
         <div x-show="!winner">
-          <p>
-            Turn: <strong x-text="currentPlayer?.inJail ? currentPlayer.name + ' 🔒' : currentPlayer?.name"></strong>
-          </p>
-          <div role="group">
-            <input
-              type="number"
-              placeholder="Score for this turn"
-              min="0"
-              x-model="turnScore"
-              @keyup.enter="recordTurn()"
-            />
-            <button @click="recordTurn()">Add turn</button>
+          <p>Turn: <strong x-text="currentPlayer?.inJail ? currentPlayer.name + ' 🔒' : currentPlayer?.name"></strong></p>
+
+          <!-- Current turn score display -->
+          <p style="font-size: 3rem; font-weight: bold; text-align: center; margin: 0.25rem 0;" x-text="turnScore"></p>
+
+          <!-- Increment buttons -->
+          <div class="grid" style="margin-bottom: 0.5rem;">
+            <button class="outline" @click="addToTurn(100)">+100</button>
+            <button class="outline" @click="addToTurn(200)">+200</button>
+            <button class="outline" @click="addToTurn(500)">+500</button>
+            <button class="outline" @click="addToTurn(1000)">+1000</button>
+          </div>
+
+          <!-- Submit and Reset -->
+          <div class="grid">
+            <button @click="recordTurn()">Submit</button>
+            <button class="secondary outline" @click="turnScore = 0">Reset</button>
           </div>
         </div>
 
