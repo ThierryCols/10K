@@ -1,22 +1,64 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>10K Scoreboard</title>
+    <title>10 000 ScoreBoard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
   </head>
   <body>
-    <main class="container" x-data="scoreboard">
 
-      <h1>🎲 10K Scoreboard</h1>
+    <!-- SVG symbol library -->
+    <svg aria-hidden="true" style="display:none">
+      <defs>
+        <!-- Medieval woodcut skull -->
+        <symbol id="skull" viewBox="0 0 50 58">
+          <!-- Cranium -->
+          <path fill="currentColor"
+            d="M25 3 C12 3 5 11 5 21 C5 29 9 36 15 40 L15 52 C15 54 17 56 19 56 L31 56 C33 56 35 54 35 52 L35 40 C41 36 45 29 45 21 C45 11 38 3 25 3Z"/>
+          <!-- Hatching shadow lines (right side) -->
+          <path d="M33 7 L40 15" stroke="#0A0A0A" stroke-width="0.6" stroke-linecap="round" opacity="0.55"/>
+          <path d="M35 12 L41 21" stroke="#0A0A0A" stroke-width="0.6" stroke-linecap="round" opacity="0.45"/>
+          <path d="M36 17 L41 26" stroke="#0A0A0A" stroke-width="0.5" stroke-linecap="round" opacity="0.3"/>
+          <!-- Left eye socket -->
+          <ellipse cx="17.5" cy="23" rx="5.5" ry="6" fill="#0A0A0A"/>
+          <!-- Right eye socket (slightly asymmetric) -->
+          <ellipse cx="32.5" cy="23" rx="5" ry="6" fill="#0A0A0A"/>
+          <!-- Nasal cavity -->
+          <path d="M22.5 32 L27.5 32 L26 37 L24 37Z" fill="#0A0A0A"/>
+          <!-- Jaw divider line -->
+          <rect x="15" y="44" width="20" height="1.5" fill="#0A0A0A"/>
+          <!-- Jaw base (light teeth block) -->
+          <rect x="15" y="46" width="20" height="9" rx="1.5" fill="currentColor"/>
+          <!-- Tooth gaps -->
+          <rect x="19.5" y="46" width="1.5" height="8.5" fill="#0A0A0A"/>
+          <rect x="24.5" y="46" width="1.5" height="8.5" fill="#0A0A0A"/>
+          <rect x="29.5" y="46" width="1.5" height="8.5" fill="#0A0A0A"/>
+          <!-- Crown crack -->
+          <path d="M25 3.5 L24.5 8.5 L26 13.5" stroke="#0A0A0A" stroke-width="0.9"
+            fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- Second small crack -->
+          <path d="M31 6 L33 11" stroke="#0A0A0A" stroke-width="0.6"
+            fill="none" stroke-linecap="round" opacity="0.6"/>
+        </symbol>
+      </defs>
+    </svg>
 
-      <!-- Player setup -->
-      <section>
+    <main class="container" x-data="scoreboard" x-cloak>
+
+      <!-- Title -->
+      <h1 class="site-title">10 000<br>ScoreBoard</h1>
+      <div class="title-ornament">◆ &nbsp; ◆ &nbsp; ◆</div>
+
+      <!-- Player setup — hidden once any player has a score > 0 -->
+      <section x-show="!gameInProgress">
         <h2>Players</h2>
         <div role="group">
           <input
             type="text"
-            placeholder="Player name"
+            placeholder="Enter a name"
             x-model="newPlayerName"
             @keyup.enter="addPlayer()"
           />
@@ -27,22 +69,21 @@
           <template x-for="player in players" :key="player.id">
             <li>
               <span x-text="player.name"></span>
-              <button class="outline secondary" @click="removePlayer(player.id)">✕</button>
+              <button class="btn-remove" @click="removePlayer(player.id)" aria-label="Remove">✕</button>
             </li>
           </template>
         </ul>
       </section>
 
-      <!-- Scoreboard -->
+      <!-- Game — visible when ≥ 2 players -->
       <section x-show="gameStarted">
-        <h2>Scores</h2>
 
         <!-- Winner banner -->
-        <article x-show="winner" role="alert">
-          🏆 <strong x-text="winner?.name"></strong> wins!
-        </article>
+        <div class="winner-banner" x-show="winner">
+          ☩&ensp;<span x-text="winner?.name"></span>&ensp;wins&ensp;☩
+        </div>
 
-        <!-- Score table: columns = players, rows = valid scoring turns -->
+        <!-- Score table: one column per player, one row per valid turn -->
         <figure>
           <table>
             <thead>
@@ -51,6 +92,7 @@
                   <th
                     :aria-current="index === currentPlayerIndex && !winner ? 'true' : null"
                     x-text="player.inJail ? player.name + ' 🔒' : player.name"
+                    class="cinzel"
                   ></th>
                 </template>
               </tr>
@@ -67,32 +109,54 @@
           </table>
         </figure>
 
-        <!-- Feedback message (jail / overshoot) -->
-        <p x-show="lastMessage" x-text="lastMessage" role="alert"></p>
+        <!-- ☠ Divider -->
+        <div class="skull-divider" aria-hidden="true">
+          <svg width="22" height="26"><use href="#skull"/></svg>
+        </div>
 
         <!-- Turn input -->
         <div x-show="!winner">
-          <p>Turn: <strong x-text="currentPlayer?.inJail ? currentPlayer.name + ' 🔒' : currentPlayer?.name"></strong></p>
+          <p class="turn-label">
+            Turn —
+            <strong
+              class="cinzel"
+              x-text="currentPlayer?.inJail ? (currentPlayer?.name + ' 🔒') : currentPlayer?.name"
+            ></strong>
+          </p>
 
-          <!-- Current turn score display -->
-          <p style="font-size: 3rem; font-weight: bold; text-align: center; margin: 0.25rem 0;" x-text="turnScore"></p>
+          <!-- Big animated score counter -->
+          <p class="turn-score" x-text="displayTurnScore"></p>
 
           <!-- Increment buttons -->
-          <div class="grid" style="margin-bottom: 0.5rem;">
-            <button class="outline" @click="addToTurn(100)">+100</button>
-            <button class="outline" @click="addToTurn(200)">+200</button>
-            <button class="outline" @click="addToTurn(500)">+500</button>
-            <button class="outline" @click="addToTurn(1000)">+1000</button>
+          <div class="increment-grid">
+            <button class="btn-increment" @click="addToTurn(100)">+100</button>
+            <button class="btn-increment" @click="addToTurn(200)">+200</button>
+            <button class="btn-increment" @click="addToTurn(500)">+500</button>
+            <button class="btn-increment" @click="addToTurn(1000)">+1000</button>
           </div>
 
-          <!-- Submit and Reset -->
-          <div class="grid">
-            <button @click="recordTurn()">Submit</button>
-            <button class="secondary outline" @click="turnScore = 0">Reset</button>
+          <!-- Reset turn | Submit -->
+          <div class="action-grid">
+            <button
+              class="btn-reset"
+              @click="turnScore = 0; displayTurnScore = 0"
+            >Reset turn</button>
+            <button
+              class="btn-submit"
+              @click="recordTurn()"
+              x-text="turnScore >= 500 ? 'Hero' : 'Grocer'"
+            ></button>
           </div>
         </div>
 
-        <button class="outline secondary" @click="resetScores()">Reset scores</button>
+        <!-- Feedback: jail / overshoot / cross messages -->
+        <p class="feedback" x-show="lastMessage" x-text="lastMessage"></p>
+
+        <!-- New Game -->
+        <button class="btn-new-game" @click="resetScores()">
+          New Game
+        </button>
+
       </section>
 
     </main>

@@ -30,6 +30,8 @@ export function createScoreboard() {
     newPlayerName: '',
     currentPlayerIndex: 0,
     turnScore: 0,
+    displayTurnScore: 0,
+    _scoreTimer: 0,
     lastMessage: '',
 
     init() {
@@ -64,6 +66,10 @@ export function createScoreboard() {
       return this.players.length >= 2
     },
 
+    get gameInProgress(): boolean {
+      return this.players.some(p => playerCurrentScore(p) > 0)
+    },
+
     get scoreRows(): (TurnEntry | null)[][] {
       const maxTurns = Math.max(0, ...this.players.map(p => p.turns.length))
       return Array.from({ length: maxTurns }, (_, i) =>
@@ -76,6 +82,30 @@ export function createScoreboard() {
       const crosses = 'x'.repeat(entry.crosses)
       if (entry.deleted) return `<s>${entry.cumulative}</s>`
       return `${entry.cumulative}${crosses ? ' ' + crosses : ''}`
+    },
+
+    // Slot-machine counter animation
+    animateScore(target: number) {
+      window.clearInterval(this._scoreTimer)
+      const steps = 14
+      const stepMs = 20
+      let step = 0
+      const origin = this.displayTurnScore
+      const range = Math.abs(target - origin) || 50
+
+      this._scoreTimer = window.setInterval(() => {
+        step++
+        if (step >= steps) {
+          this.displayTurnScore = target
+          window.clearInterval(this._scoreTimer)
+          this._scoreTimer = 0
+        } else {
+          const t = step / steps
+          const eased = 1 - Math.pow(1 - t, 2)
+          const noise = Math.round((Math.random() - 0.5) * range * 0.7 * (1 - t))
+          this.displayTurnScore = Math.round(origin + (target - origin) * eased) + noise
+        }
+      }, stepMs)
     },
 
     addPlayer() {
@@ -153,6 +183,7 @@ export function createScoreboard() {
 
     addToTurn(amount: number) {
       this.turnScore += amount
+      this.animateScore(this.turnScore)
     },
 
     recordTurn() {
@@ -168,6 +199,7 @@ export function createScoreboard() {
         } else {
           player.inJail = false
           player.turns.push({ cumulative: score, crosses: 0, deleted: false })
+          if (score >= 1500) navigator.vibrate?.(150)
           const crossed = this.triggerCrossings(score, player)
           if (crossed.length > 0) this.lastMessage = crossed.join(' ')
         }
@@ -181,6 +213,7 @@ export function createScoreboard() {
         } else {
           const newCumulative = currentScore + score
           player.turns.push({ cumulative: newCumulative, crosses: 0, deleted: false })
+          if (score >= 1500) navigator.vibrate?.(150)
           const crossed = this.triggerCrossings(newCumulative, player)
           if (crossed.length > 0) this.lastMessage = crossed.join(' ')
         }
@@ -188,6 +221,7 @@ export function createScoreboard() {
 
       this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length
       this.turnScore = 0
+      this.displayTurnScore = 0
       this.saveState()
     },
 
@@ -198,6 +232,8 @@ export function createScoreboard() {
       })
       this.currentPlayerIndex = 0
       this.lastMessage = ''
+      this.turnScore = 0
+      this.displayTurnScore = 0
       this.saveState()
     },
   }
