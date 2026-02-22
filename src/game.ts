@@ -22,6 +22,8 @@ export function playerCurrentScore(player: Player): number {
   return 0
 }
 
+const STORAGE_KEY = '10k-state'
+
 export function createScoreboard() {
   return {
     players: [] as Player[],
@@ -29,6 +31,26 @@ export function createScoreboard() {
     currentPlayerIndex: 0,
     turnScore: '' as string,
     lastMessage: '',
+
+    init() {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      if (saved) {
+        try {
+          const { players, currentPlayerIndex } = JSON.parse(saved)
+          this.players = players
+          this.currentPlayerIndex = currentPlayerIndex
+        } catch {
+          localStorage.removeItem(STORAGE_KEY)
+        }
+      }
+    },
+
+    saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        players: this.players,
+        currentPlayerIndex: this.currentPlayerIndex,
+      }))
+    },
 
     get currentPlayer(): Player | null {
       return this.players[this.currentPlayerIndex] ?? null
@@ -61,6 +83,7 @@ export function createScoreboard() {
       if (!name || this.players.some(p => p.name === name)) return
       this.players.push({ id: Date.now(), name, inJail: true, turns: [] })
       this.newPlayerName = ''
+      this.saveState()
     },
 
     removePlayer(id: number) {
@@ -68,6 +91,7 @@ export function createScoreboard() {
       if (this.currentPlayerIndex >= this.players.length) {
         this.currentPlayerIndex = 0
       }
+      this.saveState()
     },
 
     addCross(player: Player, reason: string) {
@@ -160,6 +184,7 @@ export function createScoreboard() {
 
       this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length
       this.turnScore = ''
+      this.saveState()
     },
 
     resetScores() {
@@ -169,6 +194,7 @@ export function createScoreboard() {
       })
       this.currentPlayerIndex = 0
       this.lastMessage = ''
+      this.saveState()
     },
   }
 }
