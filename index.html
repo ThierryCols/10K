@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>10K Scoreboard</title>
+  </head>
+  <body>
+    <main class="container" x-data="scoreboard">
+
+      <h1>🎲 10K Scoreboard</h1>
+
+      <!-- Player setup -->
+      <section>
+        <h2>Players</h2>
+        <div role="group">
+          <input
+            type="text"
+            placeholder="Player name"
+            x-model="newPlayerName"
+            @keyup.enter="addPlayer()"
+          />
+          <button @click="addPlayer()">Add</button>
+        </div>
+
+        <ul x-show="players.length > 0">
+          <template x-for="player in players" :key="player.id">
+            <li>
+              <span x-text="player.name"></span>
+              <button class="outline secondary" @click="removePlayer(player.id)">✕</button>
+            </li>
+          </template>
+        </ul>
+      </section>
+
+      <!-- Scoreboard -->
+      <section x-show="gameStarted">
+        <h2>Scores</h2>
+
+        <!-- Winner banner -->
+        <article x-show="winner" role="alert">
+          🏆 <strong x-text="winner?.name"></strong> wins with
+          <strong x-text="winner?.totalScore"></strong> points!
+        </article>
+
+        <figure>
+          <table>
+            <thead>
+              <tr>
+                <th>Player</th>
+                <th>Score</th>
+                <th>Turns</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="(player, index) in players" :key="player.id">
+                <tr :aria-current="index === currentPlayerIndex && !winner ? 'true' : null">
+                  <td x-text="player.name"></td>
+                  <td x-text="player.totalScore"></td>
+                  <td x-text="player.turns.length"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </figure>
+
+        <!-- Turn input -->
+        <div x-show="!winner">
+          <p>
+            Turn: <strong x-text="currentPlayer?.name"></strong>
+          </p>
+          <div role="group">
+            <input
+              type="number"
+              placeholder="Score for this turn"
+              min="0"
+              x-model="turnScore"
+              @keyup.enter="recordTurn()"
+            />
+            <button @click="recordTurn()">Add turn</button>
+          </div>
+        </div>
+
+        <button class="outline secondary" @click="resetScores()">Reset scores</button>
+      </section>
+
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
