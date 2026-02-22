@@ -93,6 +93,40 @@ export function createScoreboard() {
       this.lastMessage = reason
     },
 
+    // BFS cascade: cross every player whose current score matches a newly reached score.
+    // The player who just scored (or was just crossed) is excluded from being re-crossed.
+    triggerCrossings(newScore: number, scoringPlayer: Player): string[] {
+      const messages: string[] = []
+      const excluded = new Set<Player>([scoringPlayer])
+      const queue: number[] = [newScore]
+
+      while (queue.length > 0) {
+        const score = queue.shift()!
+        for (const player of this.players) {
+          if (excluded.has(player)) continue
+          if (playerCurrentScore(player) === score) {
+            for (let i = player.turns.length - 1; i >= 0; i--) {
+              if (!player.turns[i].deleted) {
+                player.turns[i].deleted = true
+                excluded.add(player)
+                const fallback = playerCurrentScore(player)
+                if (fallback === 0) {
+                  player.inJail = true
+                  messages.push(`${player.name} crossed! Back to jail.`)
+                } else {
+                  messages.push(`${player.name} crossed! Back to ${fallback}.`)
+                  queue.push(fallback)
+                }
+                break
+              }
+            }
+          }
+        }
+      }
+
+      return messages
+    },
+
     recordTurn() {
       const score = parseInt(this.turnScore, 10)
       if (isNaN(score) || score < 0 || !this.currentPlayer || this.winner) return
@@ -106,6 +140,8 @@ export function createScoreboard() {
         } else {
           player.inJail = false
           player.turns.push({ cumulative: score, crosses: 0, deleted: false })
+          const crossed = this.triggerCrossings(score, player)
+          if (crossed.length > 0) this.lastMessage = crossed.join(' ')
         }
       } else {
         const currentScore = playerCurrentScore(player)
@@ -115,7 +151,10 @@ export function createScoreboard() {
             : `Too high! Score would exceed ${TARGET_SCORE}.`
           this.addCross(player, reason)
         } else {
-          player.turns.push({ cumulative: currentScore + score, crosses: 0, deleted: false })
+          const newCumulative = currentScore + score
+          player.turns.push({ cumulative: newCumulative, crosses: 0, deleted: false })
+          const crossed = this.triggerCrossings(newCumulative, player)
+          if (crossed.length > 0) this.lastMessage = crossed.join(' ')
         }
       }
 
