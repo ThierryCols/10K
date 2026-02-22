@@ -59,7 +59,7 @@
               <template x-for="(row, i) in scoreRows" :key="i">
                 <tr>
                   <template x-for="(cell, j) in row" :key="j">
-                    <td x-text="cell !== null ? cell : ''"></td>
+                    <td x-html="cellHtml(cell)"></td>
                   </template>
                 </tr>
               </template>
