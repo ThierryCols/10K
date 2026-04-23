@@ -7,6 +7,7 @@ export interface TurnEntry {
 export interface Player {
   id: number
   name: string
+  sigil: string
   inJail: boolean
   turns: TurnEntry[]
 }
@@ -14,6 +15,7 @@ export interface Player {
 export const TARGET_SCORE = 10_000
 export const JAIL_MINIMUM = 500
 export const MAX_CROSSES = 3
+const SIGILS = ['sun', 'moon', 'hanged', 'skull', 'eye', 'serpent'] as const
 
 export function playerCurrentScore(player: Player): number {
   for (let i = player.turns.length - 1; i >= 0; i--) {
@@ -29,6 +31,7 @@ export function createScoreboard() {
     players: [] as Player[],
     newPlayerName: '',
     currentPlayerIndex: 0,
+    gameBegun: false,
     turnScore: 0,
     displayTurnScore: 0,
     _scoreTimer: 0,
@@ -38,9 +41,16 @@ export function createScoreboard() {
       const saved = localStorage.getItem(STORAGE_KEY)
       if (saved) {
         try {
-          const { players, currentPlayerIndex } = JSON.parse(saved)
-          this.players = players
-          this.currentPlayerIndex = currentPlayerIndex
+          const parsed = JSON.parse(saved)
+          this.players = (parsed.players ?? []).map((p: Player) => ({
+            ...p,
+            sigil: p.sigil ?? SIGILS[0],
+          }))
+          this.currentPlayerIndex = parsed.currentPlayerIndex ?? 0
+          // Migrate old saves: if any turns were played, auto-resume the game
+          this.gameBegun = parsed.gameBegun ?? this.players.some((p: Player) => p.turns.length > 0)
+          // Guard against corrupt save
+          if (this.gameBegun && this.players.length < 2) this.gameBegun = false
         } catch {
           localStorage.removeItem(STORAGE_KEY)
         }
@@ -51,7 +61,20 @@ export function createScoreboard() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         players: this.players,
         currentPlayerIndex: this.currentPlayerIndex,
+        gameBegun: this.gameBegun,
       }))
+    },
+
+    movePlayer(index: number, direction: number) {
+      const newIndex = index + direction
+      if (newIndex < 0 || newIndex >= this.players.length) return
+      const currentId = this.players[this.currentPlayerIndex]?.id
+      const [p] = this.players.splice(index, 1)
+      this.players.splice(newIndex, 0, p)
+      if (currentId != null) {
+        this.currentPlayerIndex = this.players.findIndex(x => x.id === currentId)
+      }
+      this.saveState()
     },
 
     get currentPlayer(): Player | null {
@@ -70,21 +93,42 @@ export function createScoreboard() {
       return this.players.some(p => playerCurrentScore(p) > 0)
     },
 
+    get turnNumber(): number {
+      return this.players.reduce((s, p) => s + p.turns.length, 0) + 1
+    },
+
     get scoreRows(): (TurnEntry | null)[][] {
       const maxTurns = Math.max(0, ...this.players.map(p => p.turns.length))
       return Array.from({ length: maxTurns }, (_, i) =>
-        this.players.map(p => p.turns[i] ?? null)
+        this.players.map(p => p.turns[p.turns.length - 1 - i] ?? null)
       )
+    },
+
+    get gatheringCaption(): string {
+      const words = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight']
+      const n = this.players.length
+      const w = words[n] ?? String(n)
+      return `${w} ${n === 1 ? 'soul has' : 'souls have'} gathered. only one may leave.`
+    },
+
+    playerScore(index: number): number {
+      const p = this.players[index]
+      return p ? playerCurrentScore(p) : 0
     },
 
     cellHtml(entry: TurnEntry | null): string {
       if (!entry) return ''
-      const crosses = 'x'.repeat(entry.crosses)
-      if (entry.deleted) return `<s>${entry.cumulative}</s>`
-      return `${entry.cumulative}${crosses ? ' ' + crosses : ''}`
+      const num = entry.cumulative.toLocaleString()
+      if (entry.deleted) {
+        return `<span class="cell-stricken">${num}</span>`
+      }
+      const crosses = entry.crosses > 0
+        ? `<span class="cell-crosses">${'✕'.repeat(entry.crosses)}</span>`
+        : ''
+      return `<span class="cell-score">${num}</span>${crosses}`
     },
 
-    // Slot-machine counter animation
+    // Slot-machine counter animation — do not modify
     animateScore(target: number) {
       window.clearInterval(this._scoreTimer)
       const steps = 14
@@ -92,7 +136,6 @@ export function createScoreboard() {
       let step = 0
       const origin = this.displayTurnScore
       const range = Math.abs(target - origin) || 50
-
       this._scoreTimer = window.setInterval(() => {
         step++
         if (step >= steps) {
@@ -111,7 +154,13 @@ export function createScoreboard() {
     addPlayer() {
       const name = this.newPlayerName.trim()
       if (!name || this.players.some(p => p.name === name)) return
-      this.players.push({ id: Date.now(), name, inJail: true, turns: [] })
+      this.players.push({
+        id: Date.now(),
+        name,
+        sigil: SIGILS[this.players.length % SIGILS.length],
+        inJail: true,
+        turns: [],
+      })
       this.newPlayerName = ''
       this.saveState()
     },
@@ -121,6 +170,12 @@ export function createScoreboard() {
       if (this.currentPlayerIndex >= this.players.length) {
         this.currentPlayerIndex = 0
       }
+      this.saveState()
+    },
+
+    beginGame() {
+      if (!this.gameStarted) return
+      this.gameBegun = true
       this.saveState()
     },
 
@@ -139,7 +194,7 @@ export function createScoreboard() {
               this.lastMessage = `${reason} 3 crosses — ${player.name}'s score is deleted! Back to ${newScore}.`
             }
           } else {
-            this.lastMessage = `${reason} Turn wasted — ${'x'.repeat(entry.crosses)} for ${player.name}.`
+            this.lastMessage = `${reason} Turn wasted — ${'✕'.repeat(entry.crosses)} for ${player.name}.`
           }
           return
         }
@@ -148,12 +203,10 @@ export function createScoreboard() {
     },
 
     // BFS cascade: cross every player whose current score matches a newly reached score.
-    // The player who just scored (or was just crossed) is excluded from being re-crossed.
     triggerCrossings(newScore: number, scoringPlayer: Player): string[] {
       const messages: string[] = []
       const excluded = new Set<Player>([scoringPlayer])
       const queue: number[] = [newScore]
-
       while (queue.length > 0) {
         const score = queue.shift()!
         for (const player of this.players) {
@@ -177,7 +230,6 @@ export function createScoreboard() {
           }
         }
       }
-
       return messages
     },
 
@@ -189,10 +241,8 @@ export function createScoreboard() {
     recordTurn() {
       const score = this.turnScore
       if (score < 0 || !this.currentPlayer || this.winner) return
-
       const player = this.currentPlayer
       this.lastMessage = ''
-
       if (player.inJail) {
         if (score < JAIL_MINIMUM) {
           this.lastMessage = `${player.name} is in jail — need ${JAIL_MINIMUM}+ to escape. Turn skipped.`
@@ -218,7 +268,6 @@ export function createScoreboard() {
           if (crossed.length > 0) this.lastMessage = crossed.join(' ')
         }
       }
-
       this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length
       this.turnScore = 0
       this.displayTurnScore = 0
@@ -234,6 +283,7 @@ export function createScoreboard() {
       this.lastMessage = ''
       this.turnScore = 0
       this.displayTurnScore = 0
+      this.gameBegun = false
       this.saveState()
     },
   }
